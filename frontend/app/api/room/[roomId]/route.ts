@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 
 const SIGNALING_URL =
-  process.env.NEXT_PUBLIC_SIGNALING_URL ||
-  'http://localhost:4000';
+  (process.env.NEXT_PUBLIC_SIGNALING_URL || 'http://localhost:4000')
+    .replace('wss://', 'https://')
+    .replace('ws://', 'http://');
 
 export async function GET(
   _request: Request,
