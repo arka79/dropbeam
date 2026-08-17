@@ -10,33 +10,46 @@ export default function HomePage() {
   const router = useRouter();
   const [files, setFiles] = useState<FileListItem[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savingCount, setSavingCount] = useState(0);
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isSaving = savingCount > 0;
+  const saveProgress = files.length > 0 ? (savedIds.size / files.length) * 100 : 0;
+
   const addFiles = async (incoming: FileWithPath[]) => {
     const { saveHostFile } = await import('@/lib/storage/host-store');
+    const newFiles: FileListItem[] = [];
     setFiles((prev) => {
       const out = [...prev];
       for (const { file, path } of incoming) {
         const id = `${file.name}-${file.size}-${file.lastModified || 0}-${Math.random()
           .toString(36)
           .slice(2, 6)}`;
-        out.push({
+        const item: FileListItem = {
           id,
           file,
           name: file.name,
           size: file.size,
           mime: file.type || 'application/octet-stream',
           path: path && path !== file.name ? path : undefined,
-        });
-        saveHostFile(id, file).then(() => {
-          setSavedIds((prev) => new Set(prev).add(id));
-        });
+        };
+        out.push(item);
+        newFiles.push(item);
       }
       return out;
     });
+    setSavingCount((prev) => prev + newFiles.length);
+    for (const item of newFiles) {
+      try {
+        await saveHostFile(item.id, item.file);
+        setSavedIds((prev) => new Set(prev).add(item.id));
+      } finally {
+        setSavingCount((prev) => prev - 1);
+      }
+    }
   };
 
   const total = files.reduce((a, f) => a + f.size, 0);
@@ -94,7 +107,25 @@ export default function HomePage() {
       </section>
 
       <section className="space-y-4">
-        <DropZone onFiles={addFiles} />
+        <DropZone onFiles={addFiles} disabled={isSaving} />
+
+        {files.length > 0 && (
+          <div className="card p-4">
+            <div className="mb-2 flex items-center justify-between text-xs">
+              <span className="text-white/50">
+                {isSaving ? `Saving files… ${savedIds.size}/${files.length}` : 'All files ready'}
+              </span>
+              <span className="font-mono text-white/70">{Math.round(saveProgress)}%</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-beam-500 to-beam-400 transition-all duration-300"
+                style={{ width: `${saveProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         <FileList
           files={files}
           savedIds={savedIds}
