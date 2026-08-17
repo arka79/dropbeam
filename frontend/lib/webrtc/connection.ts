@@ -22,6 +22,11 @@ export class PeerConnection {
   private makingOffer = false;
   private ignoreOffer = false;
   private dataChannel: RTCDataChannel | null = null;
+  private targetPeerId: string;
+  private disconnectedTimer: ReturnType<typeof setTimeout> | null = null;
+  private iceRestartCount = 0;
+  private static MAX_ICE_RESTARTS = 3;
+  private static DISCONNECTED_TIMEOUT_MS = 5000;
 
   constructor(opts: {
     peerId: string;
@@ -36,6 +41,7 @@ export class PeerConnection {
     this.role = opts.role;
     this.signaling = opts.signaling;
     this.roomId = opts.roomId;
+    this.targetPeerId = opts.targetPeerId;
     this.callbacks = opts.callbacks ?? {};
     this.isPolite = opts.isInitiator
       ? opts.role === 'peer'
@@ -59,7 +65,27 @@ export class PeerConnection {
     });
 
     this.pc.addEventListener('iceconnectionstatechange', () => {
-      this.callbacks.onIceConnectionStateChange?.(this.pc.iceConnectionState);
+      const state = this.pc.iceConnectionState;
+      this.callbacks.onIceConnectionStateChange?.(state);
+
+      // ICE restart logic: if disconnected for too long, attempt restart
+      if (state === 'disconnected') {
+        if (!this.disconnectedTimer) {
+          this.disconnectedTimer = setTimeout(() => {
+            this.attemptIceRestart();
+          }, PeerConnection.DISCONNECTED_TIMEOUT_MS);
+        }
+      } else {
+        // Clear timer if connected/completed/failed
+        if (this.disconnectedTimer) {
+          clearTimeout(this.disconnectedTimer);
+          this.disconnectedTimer = null;
+        }
+      }
+
+      if (state === 'failed') {
+        this.attemptIceRestart();
+      }
     });
 
     this.pc.addEventListener('negotiationneeded', () => {
@@ -119,12 +145,13 @@ export class PeerConnection {
     }
   }
 
-  private async handleNegotiation() {
+  private async handleNegotiation(iceRestart = false) {
     try {
       this.makingOffer = true;
-      await this.pc.setLocalDescription(await this.pc.createOffer());
+      const offer = await this.pc.createOffer({ iceRestart });
+      await this.pc.setLocalDescription(offer);
       if (this.pc.localDescription) {
-        this.signaling.sendOffer(this.roomId, this.peerId, this.pc.localDescription.toJSON());
+        this.signaling.sendOffer(this.roomId, this.targetPeerId, this.pc.localDescription.toJSON());
       }
     } catch (err) {
       this.callbacks.onSignalError?.(err as Error);
@@ -138,7 +165,29 @@ export class PeerConnection {
     this.callbacks.onDataChannel?.(dc);
   }
 
+  private attemptIceRestart() {
+    if (this.iceRestartCount >= PeerConnection.MAX_ICE_RESTARTS) {
+      console.warn(`[PeerConnection] Max ICE restarts (${PeerConnection.MAX_ICE_RESTARTS}) reached for peer ${this.peerId}`);
+      return;
+    }
+
+    this.iceRestartCount++;
+    console.log(`[PeerConnection] Attempting ICE restart #${this.iceRestartCount} for peer ${this.peerId}`);
+
+    try {
+      this.pc.restartIce();
+      // Trigger re-negotiation with iceRestart: true
+      this.handleNegotiation(true);
+    } catch (err) {
+      console.error('[PeerConnection] ICE restart failed:', err);
+    }
+  }
+
   close() {
+    if (this.disconnectedTimer) {
+      clearTimeout(this.disconnectedTimer);
+      this.disconnectedTimer = null;
+    }
     try {
       this.dataChannel?.close();
     } catch {}

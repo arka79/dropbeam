@@ -38,9 +38,7 @@ import type {
   ReceiverProgress,
 } from '@/lib/transfer/receiver';
 
-const SIGNALING_URL =
-  process.env.NEXT_PUBLIC_SIGNALING_URL ||
-  'http://localhost:4000';
+import { getSignalingUrl } from '@/lib/utils/signaling-url';
 
 export default function SharePage({
   params,
@@ -266,9 +264,11 @@ export default function SharePage({
         // SIGNALING
         // ----------------------------------------------------
 
+        const signalingUrl = getSignalingUrl();
+
         const signaling =
           new SignalingClient(
-            SIGNALING_URL,
+            signalingUrl,
           );
 
         signalingRef.current =

@@ -32,6 +32,8 @@ import {
   type RoomState,
 } from '@/lib/webrtc/peer';
 
+import { getSignalingUrl } from '@/lib/utils/signaling-url';
+
 interface ManifestFile {
   id: string;
   name: string;
@@ -42,28 +44,12 @@ interface ManifestFile {
 }
 
 interface Manifest {
-  /*
-   * This is the room ID that was originally used
-   * to open this host page.
-   *
-   * It is NOT authoritative anymore.
-   *
-   * The signaling server generates the real room ID.
-   */
   roomId: string;
-
   files: ManifestFile[];
-
   chunkSize: number;
-
   hasPassword: boolean;
-
   iceServers: RTCIceServer[];
 }
-
-const SIGNALING_URL =
-  process.env.NEXT_PUBLIC_SIGNALING_URL ||
-  'http://localhost:4000';
 
 export default function HostRoomPage({
   params,
@@ -178,9 +164,11 @@ export default function HostRoomPage({
           '🚀 Initializing host',
         );
 
+        const signalingUrl = getSignalingUrl();
+
         console.log(
           'Signaling server:',
-          SIGNALING_URL,
+          signalingUrl,
         );
 
         console.log(
@@ -228,7 +216,7 @@ export default function HostRoomPage({
 
         const signaling =
           new SignalingClient(
-            SIGNALING_URL,
+            signalingUrl,
           );
 
         signalingRef.current =
