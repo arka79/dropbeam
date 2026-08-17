@@ -699,12 +699,30 @@ export default function HostRoomPage({
 
         <div className="space-y-6 lg:col-span-2">
 
+          {/* SHARE CODE */}
+
+          <section className="card">
+
+            <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-white/50">
+              Share code
+            </h2>
+
+            {serverRoomId ? (
+              <ShareCode code={serverRoomId} />
+            ) : (
+              <div className="text-sm text-white/50">
+                Generating code…
+              </div>
+            )}
+
+          </section>
+
           {/* SHARE LINK */}
 
           <section className="card">
 
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-white/50">
-              Share this link
+              Or share this link
             </h2>
 
             {shareUrl ? (
@@ -842,6 +860,49 @@ export default function HostRoomPage({
       </div>
 
     </main>
+  );
+}
+
+// ===========================================================
+// SHARE CODE COMPONENT
+// ===========================================================
+
+function ShareCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 rounded-xl border border-white/10 bg-ink-900/60 px-4 py-3 font-mono text-2xl font-bold tracking-[0.3em] text-white">
+          {code}
+        </div>
+        <button onClick={copyCode} className="btn-primary px-4 py-3">
+          {copied ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15V5a2 2 0 012-2h10" />
+            </svg>
+          )}
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-white/40">
+        Share this code. Others can enter it on DropBeam to download your files.
+      </p>
+    </div>
   );
 }
 

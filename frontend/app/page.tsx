@@ -15,9 +15,30 @@ export default function HomePage() {
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const isSaving = savingCount > 0;
   const saveProgress = files.length > 0 ? (savedIds.size / files.length) * 100 : 0;
+
+  const joinWithCode = async () => {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const res = await fetch(`/api/room/${encodeURIComponent(code)}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Room not found');
+      }
+      router.push(`/share/${code}`);
+    } catch (err) {
+      setJoinError((err as Error).message);
+      setJoining(false);
+    }
+  };
 
   const addFiles = async (incoming: FileWithPath[]) => {
     const { saveHostFile } = await import('@/lib/storage/host-store');
@@ -191,6 +212,41 @@ export default function HomePage() {
             title="Verified"
             desc="SHA-256 integrity on every file"
           />
+        </div>
+      </section>
+
+      <section className="mt-10 border-t border-white/5 pt-10">
+        <div className="card">
+          <h2 className="mb-1 text-sm font-medium uppercase tracking-wider text-white/50">
+            Have a share code?
+          </h2>
+          <p className="mb-3 text-xs text-white/40">
+            Enter the code someone shared with you to download their files.
+          </p>
+          <div className="flex items-stretch gap-2">
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => {
+                setJoinCode(e.target.value.toUpperCase());
+                setJoinError(null);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && joinWithCode()}
+              placeholder="Enter code"
+              maxLength={20}
+              className="input flex-1 font-mono text-lg tracking-widest uppercase placeholder:normal-case placeholder:font-sans placeholder:text-sm placeholder:tracking-normal"
+            />
+            <button
+              onClick={joinWithCode}
+              disabled={!joinCode.trim() || joining}
+              className="btn-primary px-5"
+            >
+              {joining ? 'Joining…' : 'Join'}
+            </button>
+          </div>
+          {joinError && (
+            <div className="mt-2 text-sm text-red-300">{joinError}</div>
+          )}
         </div>
       </section>
     </main>
