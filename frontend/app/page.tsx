@@ -9,6 +9,7 @@ import { formatBytes } from '@/lib/utils/format';
 export default function HomePage() {
   const router = useRouter();
   const [files, setFiles] = useState<FileListItem[]>([]);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
@@ -30,7 +31,9 @@ export default function HomePage() {
           mime: file.type || 'application/octet-stream',
           path: path && path !== file.name ? path : undefined,
         });
-        void saveHostFile(id, file);
+        saveHostFile(id, file).then(() => {
+          setSavedIds((prev) => new Set(prev).add(id));
+        });
       }
       return out;
     });
@@ -94,7 +97,15 @@ export default function HomePage() {
         <DropZone onFiles={addFiles} />
         <FileList
           files={files}
-          onRemove={(id) => setFiles((prev) => prev.filter((f) => f.id !== id))}
+          savedIds={savedIds}
+          onRemove={(id) => {
+            setFiles((prev) => prev.filter((f) => f.id !== id));
+            setSavedIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          }}
         />
 
         <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
